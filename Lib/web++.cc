@@ -5,9 +5,10 @@ using namespace boost::asio;
 using boost::asio::ip::tcp;
 using std::string;
 
-Server::Server(unsigned short port, string root)
+Server::Server(unsigned short port, string root, string homepage)
   :m_port{port}, 
    m_root{root},
+   m_homepage{homepage},
    m_acceptor{m_io_service, tcp::endpoint{tcp::v4(), m_port}}
 {}
 
@@ -25,11 +26,18 @@ Server::isGet(const string & request)
   return request.substr(0, 3) == "GET";
 }
 
+bool
+Server::isPost(const string & request)
+{
+  return request.substr(0, 4) == "POST";
+}
+
 void
 Server::handleGet(tcp::socket & socket, const string & request)
 {
   size_t arg_end = request.find("HTTP");
   string arg = request.substr(4, arg_end - 4 - 1);
+  if(arg == "/") { arg += m_homepage; }
   string full_path = m_root + arg;
   boost::filesystem::path p{full_path};
   boost::system::error_code ec;
@@ -62,10 +70,31 @@ Server::handleGet(tcp::socket & socket, const string & request)
     std::cout << "ROUTING GET REQUEST" << std::endl;
     std::cout << m_root+arg << std::endl;
     
-    string response{"rotten muffin :(\r\n\r\n"};
+    string response{
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/xml; charset=utf-8\r\n"
+      "Content-Length: 0\r\n"
+      "\r\n\r\n"};
+      
     boost::asio::write(socket, 
         boost::asio::buffer(response.c_str(), response.length()));
   }
+}
+
+void
+Server::handlePost(tcp::socket & socket, const string & request)
+{
+  std::cout << "HANDLING POST REQUEST" << std::endl;
+
+  string response{
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Type: text/xml; charset=utf-8\r\n"
+    "Content-Length: 0\r\n"
+    "\r\n\r\n"};
+    
+  boost::asio::write(socket, 
+      boost::asio::buffer(response.c_str(), response.length()));
+
 }
 
 void 
@@ -85,6 +114,7 @@ Server::start()
     std::cout << request << std::endl;
 
     if(isGet(request)) { handleGet(socket, request); }
+    else if(isPost(request)) { handlePost(socket, request); }
     
 
     

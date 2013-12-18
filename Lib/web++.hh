@@ -15,7 +15,7 @@ namespace webxx {
   class Server
   {
     public:
-      Server(unsigned short port, std::string root);
+      Server(unsigned short port, std::string root, std::string homepage);
 
       unsigned short port();
       std::string root();
@@ -23,15 +23,19 @@ namespace webxx {
       void start();
 
       static bool isGet(const std::string & request);
-
+      static bool isPost(const std::string & request);
 
     private:
       unsigned short m_port;
       std::string m_root;
+      std::string m_homepage;
       boost::asio::io_service m_io_service;
       boost::asio::ip::tcp::acceptor m_acceptor;
 
       void handleGet(boost::asio::ip::tcp::socket &,
+          const std::string & request);
+      
+      void handlePost(boost::asio::ip::tcp::socket &,
           const std::string & request);
   };
 
