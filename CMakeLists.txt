@@ -15,4 +15,4 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 add_subdirectory(Lib)
-add_subdirectory(Bin)
+add_subdirectory(Example)

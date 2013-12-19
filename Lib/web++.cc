@@ -31,25 +31,54 @@ Server::isPost(const string & request)
 {
   return request.substr(0, 4) == "POST";
 }
-
-void
-Server::handleGet(tcp::socket & socket, const string & request)
+      
+string Server::globRequestRoute(const string & request)
 {
   size_t arg_end = request.find("HTTP");
   string arg = request.substr(4, arg_end - 4 - 1);
   if(arg == "/") { arg += m_homepage; }
-  string full_path = m_root + arg;
-  boost::filesystem::path p{full_path};
+  return m_root + arg;
+}
+
+string requestHost(const std::string & request)
+{
+  size_t host_begin = request.find("Host") + 6,
+         host_end = request.find("\r", host_begin);
+
+  return request.substr(host_begin, host_end - host_begin);
+}
+
+string
+Server::logRoute(const string & request)
+{
+  string route = globRequestRoute(request);
+  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Route: " << route;
+  return route;
+}
+
+string
+Server::logRequestor(tcp::socket & socket)
+{
+  string from = socket.remote_endpoint().address().to_string();
+  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "From: " << from;
+  return from;
+}
+
+void
+Server::handleGet(tcp::socket & socket, const string & request)
+{
+  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "GET";
+  string route = logRoute(request);
+  logRequestor(socket);
+
+  boost::filesystem::path p{route};
   boost::system::error_code ec;
 
   if(boost::filesystem::exists(p, ec))
   {
-    std::cout 
-      << "SERVING STATIC FILE" 
-      << std::endl;
-    std::cout << full_path << std::endl << std::endl;
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Serving static file";
 
-    std::ifstream is(full_path.c_str(), std::ios::in);
+    std::ifstream is(route.c_str(), std::ios::in);
     char buf[1024];
     string fs;
     while(is.read(buf, sizeof(buf)).gcount() > 0)
@@ -59,16 +88,10 @@ Server::handleGet(tcp::socket & socket, const string & request)
 
     boost::asio::write(socket,
         boost::asio::buffer(fs.c_str(), fs.length()));
-
-    std::cout
-      << "================================================================"
-      << std::endl << std::endl;
   }
   else
   {
-    std::cout << "EC : " << ec.value() << std::endl;
-    std::cout << "ROUTING GET REQUEST" << std::endl;
-    std::cout << m_root+arg << std::endl;
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Executing handler";
     
     string response{
       "HTTP/1.1 200 OK\r\n"
@@ -84,7 +107,15 @@ Server::handleGet(tcp::socket & socket, const string & request)
 void
 Server::handlePost(tcp::socket & socket, const string & request)
 {
-  std::cout << "HANDLING POST REQUEST" << std::endl;
+  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "POST";
+  logRoute(request);
+  logRequestor(socket);
+
+  size_t content_begin = request.find("\r\n\r\n") +4;
+  size_t content_end = request.find("\r\n\r\n", content_begin);
+  string content = request.substr(content_begin, content_end - content_begin);
+
+  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Content: " << content;
 
   string response{
     "HTTP/1.1 200 OK\r\n"
@@ -107,17 +138,8 @@ Server::start()
 
     string request = rcv_msg(socket);
 
-    std::cout << "REQUEST:" << std::endl;
-    std::cout
-      << "================================================================"
-      << std::endl << std::endl;
-    std::cout << request << std::endl;
-
     if(isGet(request)) { handleGet(socket, request); }
     else if(isPost(request)) { handlePost(socket, request); }
-    
-
-    
   }
 }
 
@@ -127,15 +149,21 @@ webxx::rcv_msg(ip::tcp::socket &socket)
   char data[data_chunk_size];
   boost::system::error_code err;
 
-  string msg;
   size_t read_len = socket.read_some(buffer(data, data_chunk_size), err);
-  msg = string(data, read_len);
+  string msg = string(data, read_len);
+
 
   while(read_len == data_chunk_size)
   {
     read_len = socket.read_some(buffer(data, data_chunk_size), err);
     msg += string(data, read_len);
   }
+  
+  /*
+  std::cout << "====MSG====" << std::endl;
+  std::cout << msg;
+  std::cout << "===/MSG/===" << std::endl;
+  */
 
   return msg;
 }
