@@ -40,6 +40,30 @@ webxx::requestHost(const string & request)
   return request.substr(host_begin, host_end - host_begin);
 }
 
+string
+webxx::extractContent(const string & request)
+{
+  size_t content_begin = request.find("\r\n\r\n") +4;
+  size_t content_end = request.find("\r\n\r\n", content_begin);
+  return request.substr(content_begin, content_end - content_begin);
+}
+
+string
+webxx::http200(const string & content)
+{
+  return
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/xml; charset=utf-8\r\n"
+      "Content-Length: " + std::to_string(content.length()) + "\r\n\r\n"
+      + content + "\r\n\r\n";
+}
+
+string
+webxx::http404()
+{
+  return "HTTP/1.1 404 Not Found\r\n\r\n";
+}
+
 // Server ---------------------------------------------------------------------
 Server::Server(unsigned short port, string root, string homepage)
   :m_port{port}, 
@@ -131,30 +155,13 @@ Server::handleGet(tcp::socket & socket, const string & request)
   if(boost::filesystem::exists(p, ec))
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Serving static file: " << abs_path;
-
-    std::ifstream is(abs_path.c_str(), std::ios::in);
-    char buf[1024];
-    string fs;
-    while(is.read(buf, sizeof(buf)).gcount() > 0)
-    {
-      fs = fs + string(buf, is.gcount());
-    }
-
-    boost::asio::write(socket,
-        boost::asio::buffer(fs.c_str(), fs.length()));
+    serveStaticContent(socket, abs_path);
   }
   else
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Executing handler";
-    
-    string response{
-      "HTTP/1.1 200 OK\r\n"
-      "Content-Type: text/xml; charset=utf-8\r\n"
-      "Content-Length: 0\r\n"
-      "\r\n\r\n"};
-      
-    boost::asio::write(socket, 
-        boost::asio::buffer(response.c_str(), response.length()));
+  
+    handleOr(socket, request, getStaticContent(m_root+"/404.html"));
   }
 }
 
@@ -162,6 +169,13 @@ void
 Server::handlePost(tcp::socket & socket, const string & request)
 {
   BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "POST";
+
+  handleOr(socket, request, http404());
+}
+
+void
+Server::handleOr(tcp::socket & socket, const string & request, string orElse)
+{
   string route = getRoute(request).erase(0,1);
   logRoute(route);
   logRequestor(socket);
@@ -172,34 +186,48 @@ Server::handlePost(tcp::socket & socket, const string & request)
 
   string response_content{""};
 
-  //TODO: You are here
   if(handle_iter != m_handlers.end())
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Handler Found";
-
-    size_t content_begin = request.find("\r\n\r\n") +4;
-    size_t content_end = request.find("\r\n\r\n", content_begin);
-    string request_content = 
-      request.substr(content_begin, content_end - content_begin);
+  
+    string request_content = extractContent(request);
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Request Content: " << request_content;
 
     response_content = (*handle_iter)(request_content);
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Response Content: " << response_content;
+
+    string response = http200(response_content);
+    boost::asio::write(socket, 
+        boost::asio::buffer(response.c_str(), response.length()));
   }
   else
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Warning) << "No Handler Found";
+    string response = orElse;
+    boost::asio::write(socket,
+        boost::asio::buffer(response.c_str(), response.length()));
   }
+}
 
-
-  string response {
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/xml; charset=utf-8\r\n"
-    "Content-Length: "+std::to_string(response_content.length())+"\r\n"
-    "\r\n\r\n"};
-    
-  boost::asio::write(socket, 
-      boost::asio::buffer(response.c_str(), response.length()));
+string
+Server::getStaticContent(string path)
+{
+  std::ifstream is(path.c_str(), std::ios::in);
+  char buf[1024];
+  string fs;
+  while(is.read(buf, sizeof(buf)).gcount() > 0)
+  {
+    fs = fs + string(buf, is.gcount());
+  }
+  return fs;
+}
+void
+Server::serveStaticContent(boost::asio::ip::tcp::socket & socket, 
+    string path)
+{
+  string fs = getStaticContent(path);
+  boost::asio::write(socket,
+      boost::asio::buffer(fs.c_str(), fs.length()));
 }
 
 void 

@@ -25,6 +25,10 @@ namespace webxx {
 
   std::string rcv_msg(boost::asio::ip::tcp::socket &socket);
   std::string requestHost(const std::string & request);
+  std::string extractContent(const std::string & request);
+  std::string http200(const std::string & content);
+  std::string http404();
+
 
   enum LogLevel { Normal, Warning, Error, Critical };
   BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", LogLevel);
@@ -102,6 +106,11 @@ namespace webxx {
       std::string globRequestRoute(std::string route) const;
       void logRoute(std::string route);
       void logRequestor(boost::asio::ip::tcp::socket & socket);
+      void handleOr(boost::asio::ip::tcp::socket & socket, 
+          const std::string & request, std::string orElse);
+      std::string getStaticContent(std::string path);
+      void serveStaticContent(boost::asio::ip::tcp::socket & socket,
+          std::string path);
   };
 
 }
