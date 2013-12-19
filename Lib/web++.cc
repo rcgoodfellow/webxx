@@ -5,12 +5,64 @@ using namespace boost::asio;
 using boost::asio::ip::tcp;
 using std::string;
 
+// Free Functions -------------------------------------------------------------
+string 
+webxx::rcv_msg(ip::tcp::socket &socket)
+{
+  char data[data_chunk_size];
+  boost::system::error_code err;
+
+  size_t read_len = socket.read_some(buffer(data, data_chunk_size), err);
+  string msg = string(data, read_len);
+
+
+  while(read_len == data_chunk_size)
+  {
+    read_len = socket.read_some(buffer(data, data_chunk_size), err);
+    msg += string(data, read_len);
+  }
+  
+  /*
+  std::cout << "====MSG====" << std::endl;
+  std::cout << msg;
+  std::cout << "===/MSG/===" << std::endl;
+  */
+
+  return msg;
+}
+
+string 
+webxx::requestHost(const string & request)
+{
+  size_t host_begin = request.find("Host") + 6,
+         host_end = request.find("\r", host_begin);
+
+  return request.substr(host_begin, host_end - host_begin);
+}
+
+// Server ---------------------------------------------------------------------
 Server::Server(unsigned short port, string root, string homepage)
   :m_port{port}, 
    m_root{root},
    m_homepage{homepage},
    m_acceptor{m_io_service, tcp::endpoint{tcp::v4(), m_port}}
-{}
+{
+
+  boost::log::add_console_log
+  (
+    std::cout,
+    boost::log::keywords::format = //"%TimeStamp% [%ThreadID%] <%Level%> %Message%"
+    (
+      boost::log::expressions::stream 
+        << "[" << timestamp << "] "
+        << "[" << thread_id << "] "
+        << "<" << severity << ">    "
+        << boost::log::expressions::smessage
+    )
+  );
+
+  boost::log::add_common_attributes();
+}
 
 unsigned short
 Server::port()
@@ -31,54 +83,50 @@ Server::isPost(const string & request)
 {
   return request.substr(0, 4) == "POST";
 }
+
+string
+Server::getRoute(const string & request) const
+{
+  return request.substr(4, request.find("HTTP") - 4 - 1);
+}
       
-string Server::globRequestRoute(const string & request)
+string 
+Server::globRequestRoute(string route) const
 {
-  size_t arg_end = request.find("HTTP");
-  string arg = request.substr(4, arg_end - 4 - 1);
-  if(arg == "/") { arg += m_homepage; }
-  return m_root + arg;
+  if(route == "/") { route += m_homepage; }
+  return m_root + route;
 }
 
-string requestHost(const std::string & request)
+void
+Server::logRoute(string route)
 {
-  size_t host_begin = request.find("Host") + 6,
-         host_end = request.find("\r", host_begin);
-
-  return request.substr(host_begin, host_end - host_begin);
-}
-
-string
-Server::logRoute(const string & request)
-{
-  string route = globRequestRoute(request);
   BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Route: " << route;
-  return route;
 }
 
-string
+void 
 Server::logRequestor(tcp::socket & socket)
 {
   string from = socket.remote_endpoint().address().to_string();
   BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "From: " << from;
-  return from;
 }
 
 void
 Server::handleGet(tcp::socket & socket, const string & request)
 {
-  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "GET";
-  string route = logRoute(request);
+  BOOST_LOG_SEV(m_logger, Normal) << "GET";
+  string route = getRoute(request);
+  string abs_path = globRequestRoute(route);
+  logRoute(route);
   logRequestor(socket);
 
-  boost::filesystem::path p{route};
+  boost::filesystem::path p{abs_path};
   boost::system::error_code ec;
 
   if(boost::filesystem::exists(p, ec))
   {
-    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Serving static file";
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Serving static file: " << abs_path;
 
-    std::ifstream is(route.c_str(), std::ios::in);
+    std::ifstream is(abs_path.c_str(), std::ios::in);
     char buf[1024];
     string fs;
     while(is.read(buf, sizeof(buf)).gcount() > 0)
@@ -108,8 +156,23 @@ void
 Server::handlePost(tcp::socket & socket, const string & request)
 {
   BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "POST";
-  logRoute(request);
+  string route = getRoute(request);
+  logRoute(route);
   logRequestor(socket);
+
+  auto handle_iter = 
+    std::find_if(m_handlers.begin(), m_handlers.end(),
+      [&route](const Handler &h) { return route == h.route(); });
+
+  //TODO: You are here
+  if(handle_iter != m_handlers.end())
+  {
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Handler Found";
+  }
+  else
+  {
+    BOOST_LOG_SEV(m_logger, LogLevel::Warning) << "No Handler Found";
+  }
 
   size_t content_begin = request.find("\r\n\r\n") +4;
   size_t content_end = request.find("\r\n\r\n", content_begin);
@@ -125,7 +188,6 @@ Server::handlePost(tcp::socket & socket, const string & request)
     
   boost::asio::write(socket, 
       boost::asio::buffer(response.c_str(), response.length()));
-
 }
 
 void 
@@ -143,27 +205,14 @@ Server::start()
   }
 }
 
-string 
-webxx::rcv_msg(ip::tcp::socket &socket)
-{
-  char data[data_chunk_size];
-  boost::system::error_code err;
+// Handler --------------------------------------------------------------------
+Handler::Handler(string route, RouteHandler impl)
+  :m_route{route},
+   m_impl{impl}
+{}
 
-  size_t read_len = socket.read_some(buffer(data, data_chunk_size), err);
-  string msg = string(data, read_len);
+const string &
+Handler::route() const { return m_route; }
 
-
-  while(read_len == data_chunk_size)
-  {
-    read_len = socket.read_some(buffer(data, data_chunk_size), err);
-    msg += string(data, read_len);
-  }
-  
-  /*
-  std::cout << "====MSG====" << std::endl;
-  std::cout << msg;
-  std::cout << "===/MSG/===" << std::endl;
-  */
-
-  return msg;
-}
+const Handler::RouteHandler &
+Handler::impl() const { return m_impl; }
