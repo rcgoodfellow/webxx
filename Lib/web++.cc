@@ -78,14 +78,18 @@ Server::Server(unsigned short port, string root, string homepage)
     boost::log::keywords::format = //"%TimeStamp% [%ThreadID%] <%Level%> %Message%"
     (
       boost::log::expressions::stream 
-        << "[" << timestamp << "] "
-        << "[" << thread_id << "] "
-        << "<" << severity << ">\t"
+        << boost::log::expressions::format_date_time<boost::posix_time::ptime>
+           ("TimeStamp", "%m/%d %H:%M:%S.%f ")
+        << "[" << component << "] "
+        << "<" << severity << "> "
         << boost::log::expressions::smessage
     )
   );
 
   boost::log::add_common_attributes();
+
+  m_logger.add_attribute("Component", 
+      boost::log::attributes::constant<string>("webxx"));
 }
 
 unsigned short

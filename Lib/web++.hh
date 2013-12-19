@@ -33,8 +33,13 @@ namespace webxx {
   enum LogLevel { Normal, Warning, Error, Critical };
   BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", LogLevel);
   BOOST_LOG_ATTRIBUTE_KEYWORD(line_id, "LineID", unsigned int);
-  BOOST_LOG_ATTRIBUTE_KEYWORD(timestamp, "TimeStamp", boost::posix_time::ptime)
-  BOOST_LOG_ATTRIBUTE_KEYWORD(thread_id, "ThreadID", boost::log::attributes::current_thread_id::value_type)
+  BOOST_LOG_ATTRIBUTE_KEYWORD(timestamp, "TimeStamp", 
+      boost::posix_time::ptime)
+  BOOST_LOG_ATTRIBUTE_KEYWORD(thread_id, "ThreadID", 
+      boost::log::attributes::current_thread_id::value_type)
+  BOOST_LOG_ATTRIBUTE_KEYWORD(process_id, "ProcessID",
+      boost::log::attributes::current_process_id::value_type);
+  BOOST_LOG_ATTRIBUTE_KEYWORD(component, "Component", std::string);
 
   inline
   std::ostream &
