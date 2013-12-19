@@ -56,7 +56,7 @@ Server::Server(unsigned short port, string root, string homepage)
       boost::log::expressions::stream 
         << "[" << timestamp << "] "
         << "[" << thread_id << "] "
-        << "<" << severity << ">    "
+        << "<" << severity << ">\t"
         << boost::log::expressions::smessage
     )
   );
@@ -82,6 +82,12 @@ bool
 Server::isPost(const string & request)
 {
   return request.substr(0, 4) == "POST";
+}
+
+void
+Server::addHandler(Handler h)
+{
+  m_handlers.push_back(h);
 }
 
 string
@@ -156,7 +162,7 @@ void
 Server::handlePost(tcp::socket & socket, const string & request)
 {
   BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "POST";
-  string route = getRoute(request);
+  string route = getRoute(request).erase(0,1);
   logRoute(route);
   logRequestor(socket);
 
@@ -164,26 +170,32 @@ Server::handlePost(tcp::socket & socket, const string & request)
     std::find_if(m_handlers.begin(), m_handlers.end(),
       [&route](const Handler &h) { return route == h.route(); });
 
+  string response_content{""};
+
   //TODO: You are here
   if(handle_iter != m_handlers.end())
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Handler Found";
+
+    size_t content_begin = request.find("\r\n\r\n") +4;
+    size_t content_end = request.find("\r\n\r\n", content_begin);
+    string request_content = 
+      request.substr(content_begin, content_end - content_begin);
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Request Content: " << request_content;
+
+    response_content = (*handle_iter)(request_content);
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Response Content: " << response_content;
   }
   else
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Warning) << "No Handler Found";
   }
 
-  size_t content_begin = request.find("\r\n\r\n") +4;
-  size_t content_end = request.find("\r\n\r\n", content_begin);
-  string content = request.substr(content_begin, content_end - content_begin);
 
-  BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Content: " << content;
-
-  string response{
+  string response {
     "HTTP/1.1 200 OK\r\n"
     "Content-Type: text/xml; charset=utf-8\r\n"
-    "Content-Length: 0\r\n"
+    "Content-Length: "+std::to_string(response_content.length())+"\r\n"
     "\r\n\r\n"};
     
   boost::asio::write(socket, 
@@ -214,5 +226,5 @@ Handler::Handler(string route, RouteHandler impl)
 const string &
 Handler::route() const { return m_route; }
 
-const Handler::RouteHandler &
-Handler::impl() const { return m_impl; }
+string
+Handler::operator()(string request_content) const { return m_impl(request_content); }

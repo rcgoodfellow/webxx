@@ -10,18 +10,12 @@
 #include <algorithm>
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/sinks/text_file_backend.hpp>
-#include <boost/log/utility/setup/file.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 #include <boost/log/sources/severity_feature.hpp>
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/utility/manipulators/add_value.hpp>
 #include <boost/log/utility/setup/console.hpp>
-#include <boost/log/detail/timestamp.hpp>
-#include <boost/log/expressions/formatters/date_time.hpp>
 #include <boost/log/support/date_time.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 
@@ -49,6 +43,7 @@ namespace webxx {
     return o;
   }
 
+  inline
   boost::log::formatting_ostream& 
   operator<<(boost::log::formatting_ostream& o,
     boost::log::to_log_manip<LogLevel, tag::severity> const& manip)
@@ -64,12 +59,12 @@ namespace webxx {
   class Handler
   {
     public:
-      using RouteHandler = std::function<void(const std::string &)>;
+      using RouteHandler = std::function<std::string(std::string)>;
 
       Handler(std::string route, RouteHandler impl);
 
       const std::string & route() const;
-      const RouteHandler & impl() const;
+      std::string operator()(std::string) const;
 
     private:
       std::string m_route;
@@ -83,11 +78,10 @@ namespace webxx {
 
       unsigned short port();
       std::string root();
-
       void start();
-
       static bool isGet(const std::string & request);
       static bool isPost(const std::string & request);
+      void addHandler(Handler);
 
     private:
       unsigned short m_port;
