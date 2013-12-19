@@ -53,7 +53,7 @@ webxx::http200(const string & content)
 {
   return
       "HTTP/1.1 200 OK\r\n"
-      "Content-Type: text/xml; charset=utf-8\r\n"
+      "Content-Type: text/plain; charset=utf-8\r\n"
       "Content-Length: " + std::to_string(content.length()) + "\r\n\r\n"
       + content + "\r\n\r\n";
 }
