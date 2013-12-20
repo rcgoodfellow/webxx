@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 #include <boost/log/sources/severity_feature.hpp>
@@ -69,11 +70,14 @@ namespace webxx { namespace http {
   {
     public:
       using RouteHandler = std::function<std::string(std::string)>;
+      enum class ReturnType { HTTP200, HTTP404, HTML };
 
       Handler(std::string route, RouteHandler impl);
 
       const std::string & route() const;
       std::string operator()(std::string) const;
+
+      ReturnType return_type{ReturnType::HTTP200};
 
     private:
       std::string m_route;
@@ -91,6 +95,7 @@ namespace webxx { namespace http {
       static bool isGet(const std::string & request);
       static bool isPost(const std::string & request);
       void addHandler(Handler);
+      std::string getStaticContent(std::string path);
 
     private:
       unsigned short m_port;
@@ -113,7 +118,6 @@ namespace webxx { namespace http {
       void logRequestor(boost::asio::ip::tcp::socket & socket);
       void handleOr(boost::asio::ip::tcp::socket & socket, 
           const std::string & request, std::string orElse);
-      std::string getStaticContent(std::string path);
       void serveStaticContent(boost::asio::ip::tcp::socket & socket,
           std::string path);
   };

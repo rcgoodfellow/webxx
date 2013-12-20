@@ -122,7 +122,6 @@ Server::getRoute(const string & request) const
 string 
 Server::globRequestRoute(string route) const
 {
-  if(route == "/") { route += m_homepage; }
   return m_root + route;
 }
 
@@ -144,6 +143,7 @@ Server::handleGet(tcp::socket & socket, const string & request)
 {
   BOOST_LOG_SEV(m_logger, Normal) << "GET";
   string route = getRoute(request);
+  if(route == "/") { route += m_homepage; }
   string abs_path = globRequestRoute(route);
   logRoute(route);
   logRequestor(socket);
@@ -154,13 +154,13 @@ Server::handleGet(tcp::socket & socket, const string & request)
   if(boost::filesystem::exists(p, ec))
   {
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Serving static file: " << abs_path;
-    serveStaticContent(socket, abs_path);
+    serveStaticContent(socket, route);
   }
   else
   {
-    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Executing handler";
+    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Looking for handler";
   
-    handleOr(socket, request, getStaticContent(m_root+"/404.html"));
+    handleOr(socket, request, getStaticContent("/404.html"));
   }
 }
 
@@ -175,13 +175,15 @@ Server::handlePost(tcp::socket & socket, const string & request)
 void
 Server::handleOr(tcp::socket & socket, const string & request, string orElse)
 {
-  string route = getRoute(request).erase(0,1);
-  logRoute(route);
-  logRequestor(socket);
+  string route = getRoute(request);
+  boost::erase_all(route, " ");
+  //logRoute(route);
+  //logRequestor(socket);
 
   auto handle_iter = 
     std::find_if(m_handlers.begin(), m_handlers.end(),
-      [&route](const Handler &h) { return route == h.route(); });
+      [&route](const Handler &h) 
+      { return route.substr(0, h.route().length()) == h.route(); });
 
   string response_content{""};
 
@@ -193,9 +195,22 @@ Server::handleOr(tcp::socket & socket, const string & request, string orElse)
     BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Request Content: " << request_content;
 
     response_content = (*handle_iter)(request_content);
-    BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Response Content: " << response_content;
+    if(handle_iter->return_type != Handler::ReturnType::HTML) {
+      BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "Response Content: " 
+        << response_content;
+    }
+    else
+    {
+      BOOST_LOG_SEV(m_logger, LogLevel::Normal) 
+        << "Response Content: dynamically generated HTML page";
+    }
 
-    string response = http200(response_content);
+    string response; 
+    if(handle_iter->return_type == Handler::ReturnType::HTTP200)
+    {
+      response = http200(response_content);
+    }
+    else { response = response_content; }
     boost::asio::write(socket, 
         boost::asio::buffer(response.c_str(), response.length()));
   }
@@ -211,6 +226,7 @@ Server::handleOr(tcp::socket & socket, const string & request, string orElse)
 string
 Server::getStaticContent(string path)
 {
+  path = m_root+"/"+path;
   std::ifstream is(path.c_str(), std::ios::in);
   char buf[1024];
   string fs;

@@ -18,4 +18,6 @@ add_library(web++ SHARED ${LIBSRCS} ${LIBHDRS})
 target_link_libraries(web++ boost_system boost_filesystem boost_log boost_log_setup)
 
 install(TARGETS web++ DESTINATION lib)
+install(FILES utility.hh DESTINATION include/web++)
 install(FILES http/server.hh DESTINATION include/web++/http)
+install(FILES ws/receiver.hh ws/session.hh ws/base64.hpp DESTINATION include/web++/ws)

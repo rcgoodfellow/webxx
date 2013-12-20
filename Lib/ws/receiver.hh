@@ -1,7 +1,7 @@
 #ifndef WEBXX_WS_RECEIVER
 #define WEBXX_WS_RECEIVER
 
-#include "utility.hh"
+#include "../utility.hh"
 #include <boost/asio.hpp>
 #include <functional>
 #include <string>
