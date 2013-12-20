@@ -1,9 +1,21 @@
+include_directories(${CMAKE_SOURCE_DIR}/Lib)
 
-set(LIBSRCS web++.cc)
-set(LIBHDRS web++.hh)
+set(LIBSRCS 
+  utility.cc
+  http/server.cc
+  ws/base64.cpp
+  ws/receiver.cc
+  ws/session.cc
+)
+set(LIBHDRS 
+  http/server.hh
+  ws/base64.hpp
+  ws/receiver.hh
+  ws/session.cc
+)
 
 add_library(web++ SHARED ${LIBSRCS} ${LIBHDRS})
 target_link_libraries(web++ boost_system boost_filesystem boost_log boost_log_setup)
 
 install(TARGETS web++ DESTINATION lib)
-install(FILES web++.hh DESTINATION include)
+install(FILES http/server.hh DESTINATION include/web++/http)

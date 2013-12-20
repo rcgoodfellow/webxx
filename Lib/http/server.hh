@@ -1,5 +1,5 @@
-#ifndef WEBXX_HH
-#define WEBXX_HH
+#ifndef WEBXX_HTTP_SERVER
+#define WEBXX_HTTP_SERVER
 
 #define BOOST_ALL_DYN_LINK
 
@@ -19,7 +19,7 @@
 #include <boost/log/support/date_time.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 
-namespace webxx {
+namespace webxx { namespace http {
   
   static constexpr size_t data_chunk_size{1024};
 
@@ -118,6 +118,6 @@ namespace webxx {
           std::string path);
   };
 
-}
+}}//namespace webxx::http
 
 #endif

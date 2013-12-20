@@ -1,13 +1,14 @@
-#include "web++.hh"
+#include "server.hh"
 
 using namespace webxx;
+using namespace webxx::http;
 using namespace boost::asio;
 using boost::asio::ip::tcp;
 using std::string;
 
 // Free Functions -------------------------------------------------------------
 string 
-webxx::rcv_msg(ip::tcp::socket &socket)
+webxx::http::rcv_msg(ip::tcp::socket &socket)
 {
   char data[data_chunk_size];
   boost::system::error_code err;
@@ -21,18 +22,12 @@ webxx::rcv_msg(ip::tcp::socket &socket)
     read_len = socket.read_some(buffer(data, data_chunk_size), err);
     msg += string(data, read_len);
   }
-  
-  /*
-  std::cout << "====MSG====" << std::endl;
-  std::cout << msg;
-  std::cout << "===/MSG/===" << std::endl;
-  */
 
   return msg;
 }
 
 string 
-webxx::requestHost(const string & request)
+webxx::http::requestHost(const string & request)
 {
   size_t host_begin = request.find("Host") + 6,
          host_end = request.find("\r", host_begin);
@@ -41,7 +36,7 @@ webxx::requestHost(const string & request)
 }
 
 string
-webxx::extractContent(const string & request)
+webxx::http::extractContent(const string & request)
 {
   size_t content_begin = request.find("\r\n\r\n") +4;
   size_t content_end = request.find("\r\n\r\n", content_begin);
@@ -49,7 +44,7 @@ webxx::extractContent(const string & request)
 }
 
 string
-webxx::http200(const string & content)
+webxx::http::http200(const string & content)
 {
   return
       "HTTP/1.1 200 OK\r\n"
@@ -59,7 +54,7 @@ webxx::http200(const string & content)
 }
 
 string
-webxx::http404()
+webxx::http::http404()
 {
   return "HTTP/1.1 404 Not Found\r\n\r\n";
 }

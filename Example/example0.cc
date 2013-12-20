@@ -1,4 +1,4 @@
-#include "web++.hh"
+#include "http/server.hh"
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 {
   try {
     CommandArgs args = getCommandArgs(argc, argv);
-    webxx::Server server(args.port, args.location, args.homepage);
+    webxx::http::Server server(args.port, args.location, args.homepage);
     server.start();
   }
   catch(std::exception &e) { cerr << e.what() << endl; }
