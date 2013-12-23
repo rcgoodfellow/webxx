@@ -15,7 +15,7 @@ set(LIBHDRS
 )
 
 add_library(web++ SHARED ${LIBSRCS} ${LIBHDRS})
-target_link_libraries(web++ boost_system boost_filesystem boost_log boost_log_setup)
+target_link_libraries(web++ boost_system boost_thread boost_filesystem boost_log boost_log_setup)
 
 install(TARGETS web++ DESTINATION lib)
 install(FILES utility.hh log.hh DESTINATION include/web++)

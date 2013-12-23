@@ -7,6 +7,11 @@ using std::vector;
 using std::function;
 using namespace boost::asio;
 
+#ifdef __APPLE__
+#include <libkern/OSByteOrder.h>
+#define be64toh(x) OSSwapBigToHostInt64(x)
+#endif
+
 Receiver::Receiver(boost::asio::ip::tcp::socket &socket)
   : mp_socket{&socket} {}
 
