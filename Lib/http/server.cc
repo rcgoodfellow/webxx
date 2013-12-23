@@ -168,6 +168,8 @@ void
 Server::handlePost(tcp::socket & socket, const string & request)
 {
   BOOST_LOG_SEV(m_logger, LogLevel::Normal) << "POST";
+  string route = getRoute(request);
+  logRoute(route);
 
   handleOr(socket, request, http404());
 }
